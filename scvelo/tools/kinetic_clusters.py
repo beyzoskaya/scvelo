@@ -1,17 +1,23 @@
-# scvelo/tools/kinetic_clusters.py
+from typing import Optional
+
 import numpy as np
-import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-from .. import logging as logg
 
-def kinetic_clusters(adata, n_clusters=4, copy=False):
+from anndata import AnnData
+
+from scvelo import logging as logg
+
+
+def kinetic_clusters(
+    adata: AnnData, n_clusters: int = 4, copy: bool = False
+) -> Optional[AnnData]:
     """
-    Clustering of genes based on their kinetic parameters (alpha, beta, gamma).
-    
-    This identifies functional groups of genes (e.g. 'Fast Response', 'Transient', 
+    Cluster genes based on their kinetic parameters.
+
+    Identifies functional gene groups (e.g. 'Fast Response', 'Transient',
     'Accumulating') based on the differential equations learned by recover_dynamics.
-    
+
     Parameters
     ----------
     adata
@@ -19,30 +25,31 @@ def kinetic_clusters(adata, n_clusters=4, copy=False):
     n_clusters
         Number of kinetic regimes to find.
     copy
-        Return a copy instead of writing to adata.
-        
+        Return a copy instead of writing to ``adata``.
+
     Returns
     -------
-    Updates `adata.var` with the column `kinetic_cluster`.
+    Returns or updates ``adata`` with the column ``kinetic_cluster`` in ``adata.var``.
     """
-    logg.info('clustering genes by kinetics', r=True)
+    logg.info("clustering genes by kinetics", r=True)
 
     # 1. Validation
-    if 'fit_alpha' not in adata.var.keys():
-        raise ValueError("Kinetic parameters not found. Run scv.tl.recover_dynamics(adata) first.")
+    if "fit_alpha" not in adata.var.keys():
+        raise ValueError(
+            "Kinetic parameters not found. Run scv.tl.recover_dynamics(adata) first."
+        )
 
-    # 2. Extract Data (Only use genes that were successfully fitted)
-    # We use R2 > 0 to filter out genes where the model failed
-    valid_mask = (adata.var['fit_r2'] > 0) & (adata.var['fit_alpha'].notnull())
-    
+    # 2. Extract Data (Filter valid fits)
+    valid_mask = (adata.var["fit_r2"] > 0) & (adata.var["fit_alpha"].notnull())
+
     if valid_mask.sum() < n_clusters:
-        raise ValueError("Not enough fitted genes to perform clustering.")
+        raise ValueError(
+            f"Not enough fitted genes ({valid_mask.sum()}) to perform clustering."
+        )
 
-    # Get the 3 parameters: Transcription (alpha), Splicing (beta), Degradation (gamma)
-    features = adata.var.loc[valid_mask, ['fit_alpha', 'fit_beta', 'fit_gamma']]
+    features = adata.var.loc[valid_mask, ["fit_alpha", "fit_beta", "fit_gamma"]]
 
     # 3. Log Transform & Scale
-    # Biological rates span orders of magnitude, so we log-transform first.
     X = np.log1p(features.values)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -52,13 +59,52 @@ def kinetic_clusters(adata, n_clusters=4, copy=False):
     clusters = kmeans.fit_predict(X_scaled)
 
     # 5. Save Results
-    # Initialize column with 'nan' strings
-    col_name = 'kinetic_cluster'
-    adata.var[col_name] = 'nan'
-    # Fill in the clusters for the valid genes
+    col_name = "kinetic_cluster"
+    adata.var[col_name] = "nan"
     adata.var.loc[valid_mask, col_name] = clusters.astype(str)
 
-    logg.info('    finished', time=True, end=' ')
-    logg.hint(f'added \n    {col_name!r}, clusters of kinetic parameters (adata.var)')
+    logg.info("    finished", time=True, end=" ")
+    logg.hint(f"added \n    {col_name!r}, clusters of kinetic parameters (adata.var)")
+
+    return adata if copy else None
+
+
+def score_kinetic_clusters(adata: AnnData, copy: bool = False) -> Optional[AnnData]:
+    """
+    Score cells based on kinetic cluster activity.
+
+    Calculates a module score for each kinetic cluster across all cells.
+    Allows visualization of where specific kinetic regimes are active.
+
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    copy
+        Return a copy instead of writing to ``adata``.
+
+    Returns
+    -------
+    Returns or updates ``adata`` with columns ``Kinetic_Cluster_0``, etc. in ``adata.obs``.
+    """
+    import scanpy as sc
+
+    if "kinetic_cluster" not in adata.var.keys():
+        raise ValueError("Please run scv.tl.kinetic_clusters(adata) first.")
+
+    clusters = adata.var["kinetic_cluster"].unique()
+    # Filter out 'nan' string
+    clusters = [c for c in clusters if str(c) != "nan"]
+
+    logg.info("scoring kinetic clusters", r=True)
+
+    for c in clusters:
+        gene_list = adata.var[adata.var["kinetic_cluster"] == c].index.tolist()
+        if len(gene_list) > 0:
+            score_name = f"Kinetic_Cluster_{c}"
+            sc.tl.score_genes(adata, gene_list=gene_list, score_name=score_name)
+
+    logg.info("    finished", time=True, end=" ")
+    logg.hint("added scores for each kinetic cluster to adata.obs")
 
     return adata if copy else None

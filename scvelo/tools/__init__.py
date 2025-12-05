@@ -9,6 +9,7 @@ from ._em_model_core import (
     recover_latent_time,
 )
 from ._steady_state_model import SecondOrderSteadyStateModel, SteadyStateModel
+from .kinetic_clusters import kinetic_clusters, score_kinetic_clusters
 from .paga import paga
 from .rank_velocity_genes import rank_velocity_genes, velocity_clusters
 from .score_genes_cell_cycle import score_genes_cell_cycle
@@ -19,7 +20,6 @@ from .velocity_confidence import velocity_confidence, velocity_confidence_transi
 from .velocity_embedding import velocity_embedding
 from .velocity_graph import velocity_graph
 from .velocity_pseudotime import velocity_map, velocity_pseudotime
-from .kinetic_clusters import kinetic_clusters
 
 __all__ = [
     "align_dynamics",
@@ -47,4 +47,6 @@ __all__ = [
     "SteadyStateModel",
     "SecondOrderSteadyStateModel",
     "ExpectationMaximizationModel",
+    "kinetic_clusters",
+    "score_kinetic_clusters",
 ]
