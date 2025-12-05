@@ -11,6 +11,7 @@ from .velocity_embedding import velocity_embedding
 from .velocity_embedding_grid import velocity_embedding_grid
 from .velocity_embedding_stream import velocity_embedding_stream
 from .velocity_graph import velocity_graph
+from .kinetic_clusters import kinetic_clusters
 
 __all__ = [
     "diffmap",

@@ -19,6 +19,7 @@ from .velocity_confidence import velocity_confidence, velocity_confidence_transi
 from .velocity_embedding import velocity_embedding
 from .velocity_graph import velocity_graph
 from .velocity_pseudotime import velocity_map, velocity_pseudotime
+from .kinetic_clusters import kinetic_clusters
 
 __all__ = [
     "align_dynamics",
